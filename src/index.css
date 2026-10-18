@@ -1,0 +1,118 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    @apply bg-canvas text-ink font-sans antialiased;
+    line-height: 1.6;
+  }
+  h1, h2, h3, h4 {
+    line-height: 1.25;
+    @apply font-semibold text-ink;
+  }
+  :focus-visible {
+    @apply outline-none ring-2 ring-forest-500 ring-offset-2 ring-offset-canvas rounded;
+  }
+  /* Urdu RTL typography */
+  [lang='ur'] body,
+  .font-urdu {
+    font-family: 'Noto Nastaliq Urdu', 'Inter', sans-serif;
+    line-height: 2.1;
+  }
+  [dir='rtl'] {
+    text-align: right;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all duration-150 focus-visible:ring-2 focus-visible:ring-forest-500 focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none;
+  }
+  .btn-primary {
+    @apply btn bg-forest-600 text-white hover:bg-forest-700 active:bg-forest-800 shadow-sm;
+  }
+  .btn-secondary {
+    @apply btn bg-white text-forest-700 border border-forest-200 hover:bg-forest-50 active:bg-forest-100;
+  }
+  .btn-ghost {
+    @apply btn text-ink-soft hover:bg-sand-100 active:bg-sand-200;
+  }
+  .btn-danger {
+    @apply btn bg-coral-500 text-white hover:bg-coral-600 active:bg-coral-700;
+  }
+  .btn-warning {
+    @apply btn bg-coral-50 text-coral-700 border border-coral-200 hover:bg-coral-100;
+  }
+  .card {
+    @apply bg-surface rounded-2xl border border-sand-100 shadow-card;
+  }
+  .field-label {
+    @apply block text-sm font-medium text-ink-soft mb-1.5;
+  }
+  .field-input {
+    @apply w-full rounded-xl border border-sand-200 bg-white px-3.5 py-2.5 text-ink placeholder:text-ink-muted/70 focus:border-forest-400 focus:ring-2 focus:ring-forest-200 transition;
+  }
+  .field-error {
+    @apply mt-1.5 text-sm text-coral-600;
+  }
+  .badge {
+    @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium;
+  }
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded-full border border-sand-200 bg-white px-3 py-1.5 text-sm text-ink-soft transition hover:border-forest-300 hover:bg-forest-50;
+  }
+  .chip-active {
+    @apply border-forest-500 bg-forest-50 text-forest-700;
+  }
+  .link {
+    @apply text-forest-700 underline underline-offset-2 hover:text-forest-800;
+  }
+}
+
+/* Leaflet container height */
+.leaflet-container {
+  height: 100%;
+  width: 100%;
+  font: inherit;
+  background: #EAF3EC;
+}
+.leaflet-container a { color: #2E7D43; }
+
+/* Custom map marker */
+.saafspot-marker {
+  background: transparent;
+  border: none;
+}
+.saafspot-pin {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50% 50% 50% 0;
+  transform: rotate(-45deg);
+  box-shadow: 0 4px 10px rgba(16,44,23,0.35);
+  border: 2px solid #fff;
+}
+.saafspot-pin > span {
+  transform: rotate(45deg);
+  color: #fff;
+  font-size: 14px;
+  line-height: 1;
+}
+
+/* Print styles for the action brief */
+@media print {
+  body * { visibility: hidden; }
+  .print-area, .print-area * { visibility: visible; }
+  .print-area {
+    position: absolute;
+    left: 0; top: 0; width: 100%;
+    padding: 0; margin: 0;
+  }
+  .no-print { display: none !important; }
+  @page { margin: 1.6cm; }
+}
