@@ -197,9 +197,15 @@ export async function createReport(
   if (rErr) throw rErr;
   const reportId = (rData as { id: string }).id;
 
-  // Append-only event. Recompute hotspot status from full report set so the
-  // community-evidence state stays transparent and auditable.
-  await recomputeHotspotStatus(hotspotId);
+  // A community-submitted context event. The DB trigger derives the hotspot's
+  // status from the inserted report row; we do not set status here.
+  await supabase.from('activity_events').insert({
+    hotspot_id: hotspotId,
+    event_type: input.is_cleanup ? 'cleanup_observed' : 'report_added',
+    detail: input.is_cleanup
+      ? 'Community-submitted cleanup observation.'
+      : 'Community-submitted observation logged.',
+  });
 
   return {
     hotspot_id: hotspotId,
@@ -250,9 +256,9 @@ export async function confirmHotspot(
   await supabase.from('activity_events').insert({
     hotspot_id: hotspotId,
     event_type: 'confirmation_added',
-    detail: 'Community confirmation received.',
+    detail: 'Community-submitted confirmation received.',
   });
-  await recomputeHotspotStatus(hotspotId);
+  // The DB trigger on confirmations recomputes status; no client UPDATE.
   return { alreadyConfirmed: false };
 }
 
@@ -265,63 +271,8 @@ export function isConfirmedByMe(
 }
 
 // ---------------------------------------------------------------------------
-// Status recomputation + brief flag
+// Brief flag (the only status a client may request, via a narrow RPC)
 // ---------------------------------------------------------------------------
-
-export async function recomputeHotspotStatus(hotspotId: string): Promise<void> {
-  if (!supabase) return;
-  const { data: reports } = await supabase
-    .from('reports')
-    .select('is_cleanup, observed_at')
-    .eq('hotspot_id', hotspotId)
-    .order('observed_at', { ascending: true });
-  const { data: conf } = await supabase
-    .from('confirmations')
-    .select('id')
-    .eq('hotspot_id', hotspotId);
-  const rs = (reports ?? []) as { is_cleanup: boolean; observed_at: string }[];
-  const confCount = (conf ?? []).length;
-
-  const current = await supabase
-    .from('hotspots')
-    .select('status')
-    .eq('id', hotspotId)
-    .maybeSingle();
-  const prev = (current.data as { status: Status } | null)?.status ?? 'reported';
-
-  // Only auto-advance from 'reported' to 'corroborated' on confirmations.
-  // Never auto-downgrade a brief_prepared / cleanup_observed status.
-  let next: Status = prev;
-  const hasCleanup = rs.some((r) => r.is_cleanup);
-  const lastCleanupObs = rs
-    .filter((r) => r.is_cleanup)
-    .map((r) => r.observed_at)
-    .sort()
-    .at(-1);
-  const laterReports = rs.filter(
-    (r) => !r.is_cleanup && lastCleanupObs && r.observed_at > lastCleanupObs,
-  );
-
-  if (hasCleanup && laterReports.length > 0 && prev !== 'recurring') {
-    next = 'recurring';
-  } else if (confCount >= 2 && prev === 'reported') {
-    next = 'corroborated';
-  }
-
-  if (next !== prev) {
-    await supabase.from('hotspots').update({ status: next }).eq('id', hotspotId);
-    await supabase.from('activity_events').insert({
-      hotspot_id: hotspotId,
-      event_type: 'status_changed',
-      from_status: prev,
-      to_status: next,
-      detail:
-        next === 'recurring'
-          ? 'Recurrence detected after a new same-category report.'
-          : 'Status updated after multiple confirmations.',
-    });
-  }
-}
 
 export async function markBriefPrepared(hotspotId: string): Promise<void> {
   if (!supabase) {
@@ -335,27 +286,18 @@ export async function markBriefPrepared(hotspotId: string): Promise<void> {
         event_type: 'brief_prepared',
         from_status: prev,
         to_status: 'brief_prepared',
-        detail: 'Action brief prepared.',
+        detail: 'Action brief prepared by a community member.',
         created_at: new Date().toISOString(),
       });
     }
     return;
   }
-  const { data: cur } = await supabase
-    .from('hotspots')
-    .select('status')
-    .eq('id', hotspotId)
-    .maybeSingle();
-  const prev = (cur as { status: Status } | null)?.status;
-  if (prev === 'brief_prepared') return;
-  await supabase.from('hotspots').update({ status: 'brief_prepared' }).eq('id', hotspotId);
-  await supabase.from('activity_events').insert({
-    hotspot_id: hotspotId,
-    event_type: 'brief_prepared',
-    from_status: prev ?? null,
-    to_status: 'brief_prepared',
-    detail: 'Action brief prepared.',
+  // The DB function mark_brief_prepared only sets that one status, refuses to
+  // overwrite cleanup_observed/recurring, and inserts the activity event.
+  const { error } = await supabase.rpc('mark_brief_prepared', {
+    target_hotspot: hotspotId,
   });
+  if (error) throw error;
 }
 
 // ---------------------------------------------------------------------------
